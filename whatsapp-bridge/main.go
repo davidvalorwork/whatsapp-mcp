@@ -50,8 +50,10 @@ type MessageStore struct {
 var mediaRetryWaiters sync.Map // map[types.MessageID]chan *events.MediaRetry
 
 const outboundMessageInterval = 5 * time.Second
-const newContactLimit = 5
+const newContactLimit = 30
 const newContactWindow = 24 * time.Hour
+const newContactHourlyLimit = 5
+const newContactHourlyWindow = time.Hour
 
 // All recipients and message types share one gate, including concurrent API calls.
 var outboundMessages = messageSendGate{interval: outboundMessageInterval}
@@ -317,6 +319,12 @@ func (store *MessageStore) reserveNewContact(key, alternate string, saved bool, 
 	}
 	if count >= newContactLimit {
 		return fmt.Errorf("máximo de %d contactos nuevos en las últimas 24 horas alcanzado", newContactLimit)
+	}
+	if err = tx.QueryRow(`SELECT COUNT(*) FROM outbound_contact_attempts WHERE attempted_at > ?`, now.Add(-newContactHourlyWindow).Unix()).Scan(&count); err != nil {
+		return err
+	}
+	if count >= newContactHourlyLimit {
+		return fmt.Errorf("máximo de %d contactos nuevos en la última hora alcanzado", newContactHourlyLimit)
 	}
 	if _, err = tx.Exec(`INSERT INTO outbound_contact_attempts (recipient, attempted_at) VALUES (?, ?)`, key, now.Unix()); err != nil {
 		return err

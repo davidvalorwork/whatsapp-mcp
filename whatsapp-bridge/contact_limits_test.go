@@ -22,7 +22,10 @@ func TestNewContactLimitPersistsAndExpires(t *testing.T) {
 	store := contactTestStore(t)
 	now := time.Date(2026, 10, 4, 12, 0, 0, 0, time.UTC)
 	for i := 0; i < newContactLimit; i++ {
-		if err := store.reserveNewContact(fmt.Sprintf("%d@s.whatsapp.net", i), "", false, now); err != nil {
+		// Six batches over six hours fill the daily allowance without exceeding
+		// the hourly allowance; the most recent batch is at now.
+		attempt := now.Add(-time.Duration((newContactLimit-1-i)/newContactHourlyLimit) * time.Hour)
+		if err := store.reserveNewContact(fmt.Sprintf("%d@s.whatsapp.net", i), "", false, attempt); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -33,13 +36,48 @@ func TestNewContactLimitPersistsAndExpires(t *testing.T) {
 	}
 	defer reopened.Close()
 	if err := reopened.reserveNewContact("new@s.whatsapp.net", "", false, now); err == nil {
-		t.Fatal("sixth new contact must be blocked after restart")
+		t.Fatal("daily allowance must be enforced after restart")
+	}
+	if err := reopened.reserveNewContact("new@s.whatsapp.net", "", false, now.Add(time.Hour)); err == nil {
+		t.Fatal("daily limit must still apply when the hourly allowance is available")
 	}
 	if err := reopened.reserveNewContact("0@s.whatsapp.net", "", false, now.Add(25*time.Hour)); err == nil {
 		t.Fatal("an unanswered contact stays blocked even after 24 hours")
 	}
 	if err := reopened.reserveNewContact("new@s.whatsapp.net", "", false, now.Add(24*time.Hour)); err != nil {
 		t.Fatalf("rolling window must expire after 24 hours: %v", err)
+	}
+}
+
+func TestHourlyContactLimitPersistsAndExpires(t *testing.T) {
+	store := contactTestStore(t)
+	now := time.Date(2026, 10, 5, 12, 0, 0, 0, time.UTC)
+	for i := 0; i < newContactHourlyLimit; i++ {
+		if err := store.reserveNewContact(fmt.Sprintf("hourly%d@s.whatsapp.net", i), "", false, now); err != nil {
+			t.Fatal(err)
+		}
+	}
+	store.Close()
+	reopened, err := NewMessageStore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reopened.Close()
+	if err := reopened.reserveNewContact("later@s.whatsapp.net", "", false, now.Add(time.Hour-time.Second)); err == nil {
+		t.Fatal("hourly limit must survive restart and block until the rolling window expires")
+	}
+	var count int
+	if err := reopened.db.QueryRow(`SELECT COUNT(*) FROM outbound_contact_attempts`).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != newContactHourlyLimit {
+		t.Fatal("a rate-limit rejection must not reserve a new recipient")
+	}
+	if err := reopened.reserveNewContact("later@s.whatsapp.net", "", false, now.Add(time.Hour)); err != nil {
+		t.Fatalf("hourly allowance must become available at the window boundary: %v", err)
+	}
+	if err := reopened.reserveNewContact("hourly0@s.whatsapp.net", "", false, now.Add(time.Hour)); err == nil {
+		t.Fatal("hourly expiry must not permit an unanswered recipient to be contacted again")
 	}
 }
 
@@ -107,7 +145,7 @@ func TestConcurrentFirstContactsStayWithinLimit(t *testing.T) {
 			allowed++
 		}
 	}
-	if allowed != newContactLimit {
-		t.Fatalf("concurrent attempts allowed %d; want %d", allowed, newContactLimit)
+	if allowed != newContactHourlyLimit {
+		t.Fatalf("concurrent attempts allowed %d; want %d", allowed, newContactHourlyLimit)
 	}
 }

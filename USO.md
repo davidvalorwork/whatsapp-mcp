@@ -19,10 +19,12 @@ Al enviar lotes, hay que esperar cada respuesta y usar un tiempo de espera sufic
 para las solicitudes en cola. La pausa reduce la frecuencia; no garantiza evitar
 restricciones o desvinculaciones de WhatsApp.
 
-## Límite de contactos nuevos — 04/10/2026
+## Límite de contactos nuevos — actualizado 05/10/2026
 
-- El bridge permite **como máximo cinco números privados nuevos en las últimas 24 horas**;
-  es una ventana móvil, no un contador que se reinicia a medianoche.
+- A solicitud del dueño, el bridge permite **como máximo treinta números privados nuevos
+  en las últimas 24 horas** y **cinco en la última hora**. Ambas son ventanas móviles:
+  no se reinician a medianoche ni al cambiar la hora del reloj. Se conservan las reservas
+  anteriores al cambiar el límite; la pausa global de cinco segundos sigue activa.
 - Considera nuevo a quien no tiene nombre guardado en la agenda ni mensajes recibidos en
   el chat. Un nombre de perfil o de empresa no demuestra que esté guardado.
 - Permite **un primer intento por número**, hasta que llegue una respuesta. Después

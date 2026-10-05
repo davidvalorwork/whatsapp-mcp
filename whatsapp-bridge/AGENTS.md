@@ -6,7 +6,8 @@
 - Serializar los envíos concurrentes. No saltarse el límite desde scripts, herramientas
   ni nuevos puntos de envío. Conservar las pruebas de intervalo y concurrencia.
 - En lotes, esperar la respuesta de cada solicitud antes de enviar la siguiente.
-- Máximo cinco destinatarios privados nuevos en una ventana móvil de 24 horas.
+- Máximo treinta destinatarios privados nuevos en una ventana móvil de 24 horas
+  y cinco en una ventana móvil de una hora, solicitado por el dueño el 05/10/2026.
   Nuevo significa sin nombre guardado en la agenda y sin mensajes recibidos en ese chat.
   Los nombres de perfil/comercio de WhatsApp no equivalen a un contacto guardado.
 - Solo un primer intento por número nuevo hasta recibir respuesta; no reintentar
